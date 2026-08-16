@@ -1,0 +1,61 @@
+name: Release
+
+# Fires when a version tag is pushed:
+#
+#   git tag v2.1.0 && git push origin v2.1.0
+#
+# and publishes prebuilt binaries for all four targets, so installing clipd
+# does not require a Go toolchain on the target machine.
+on:
+  push:
+    tags: ["v*"]
+
+# Creating a release means writing to the repository.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The Makefile derives the version from `git describe --tags`. The
+          # default shallow clone has no tags, so without this every release
+          # would be stamped "dev".
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # A tag that cannot pass its own tests should not become a release.
+      - name: Test
+        run: go test -race ./...
+
+      - name: Build
+        run: make dist
+
+      - name: Checksums
+        # Lets anyone verify a download matches what this workflow produced:
+        #   shasum -a 256 -c SHA256SUMS
+        working-directory: dist
+        run: sha256sum clipd_* > SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # gh is preinstalled on GitHub runners, so this needs no third-party
+        # action — which keeps the release path as dependency-free as the
+        # project itself.
+        run: |
+          version="${GITHUB_REF_NAME}"
+          gh release create "$version" \
+            --title "clipd $version" \
+            --generate-notes \
+            dist/clipd_darwin_arm64 \
+            dist/clipd_darwin_amd64 \
+            dist/clipd_linux_amd64 \
+            dist/clipd_linux_arm64 \
+            dist/SHA256SUMS
