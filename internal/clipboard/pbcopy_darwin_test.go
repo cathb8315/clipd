@@ -79,11 +79,20 @@ func TestPbcopyReportsFailure(t *testing.T) {
 	}
 }
 
+// TestPbcopyRespectsContext covers the worst case: a helper that outlives the
+// kill signal and leaves a child holding the pipes open.
+//
+// The trailing echo matters. Without it a shell will often exec into the last
+// command, replacing itself, so killing the process kills the sleep too and
+// the hard path never runs. With it, the shell forks, and the orphaned sleep
+// keeps the stderr pipe open after the shell dies — which is exactly what made
+// this test pass locally and hang for 30 seconds on CI. cmd.WaitDelay is what
+// bounds it now.
 func TestPbcopyRespectsContext(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	clip := &pbcopy{path: writeScript(t, dir, "#!/bin/sh\nsleep 30\n")}
+	clip := &pbcopy{path: writeScript(t, dir, "#!/bin/sh\nsleep 30\necho unreachable\n")}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -92,8 +101,14 @@ func TestPbcopyRespectsContext(t *testing.T) {
 	if err := clip.Write(ctx, []byte("x")); err == nil {
 		t.Fatal("Write succeeded despite an expired context")
 	}
-	if elapsed := time.Since(start); elapsed > 5*time.Second {
+	elapsed := time.Since(start)
+	if elapsed > waitDelay+3*time.Second {
 		t.Errorf("Write took %s; the context did not bound the helper", elapsed)
+	}
+	// It should not return before the delay it promised, either: returning
+	// early would mean the pipes were abandoned rather than bounded.
+	if elapsed < 100*time.Millisecond {
+		t.Errorf("Write returned in %s, before the context even expired", elapsed)
 	}
 }
 

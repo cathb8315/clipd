@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // pbcopyPath is macOS's built-in clipboard writer. Shelling out to it avoids
@@ -36,9 +37,20 @@ type pbcopy struct {
 
 func (p *pbcopy) Name() string { return p.path }
 
+// waitDelay bounds how long Run may linger after the context is cancelled.
+//
+// Cancelling the context kills the helper, but Run also waits for the stdin
+// and stderr pipes to close, and a killed process can leave a child holding
+// them open. Without this bound, Run blocks until that child exits on its own,
+// which defeats the deadline the caller set. Real pbcopy spawns nothing, so
+// this never fires in practice — it exists so that a hung or unusual helper
+// cannot outlive its context.
+const waitDelay = 2 * time.Second
+
 func (p *pbcopy) Write(ctx context.Context, data []byte) error {
 	cmd := exec.CommandContext(ctx, p.path)
 	cmd.Stdin = bytes.NewReader(data)
+	cmd.WaitDelay = waitDelay
 
 	// pbcopy is silent on success. Capturing stderr gives a useful message on
 	// failure; stdout is discarded. Neither ever contains clipboard content.
