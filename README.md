@@ -13,7 +13,7 @@ The output is now in the Mac's clipboard.
 
 [OSC 52](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) does the same
 job through a terminal escape sequence, and is simpler when it works. clipd is
-for the cases where it doesn't: Terminal.app doesn't support it, and in some
+for cases where it does not. Terminal.app doesn't support it, and in some
 multiplexer and nested-SSH setups the sequence doesn't reliably reach the local
 terminal.
 
@@ -45,51 +45,41 @@ token.
 
 ## Install
 
-These commands install a binary with `sudo`, so they verify it first. The
-checksum step must print `OK`; if it prints anything else, the download is not
-what the release workflow produced and should not be installed.
-
 ### macOS
 
+Apple Silicon:
+
 ```bash
-ASSET=clipd_darwin_arm64   # Intel Macs: clipd_darwin_amd64
-BASE=https://github.com/colefailla/clipd/releases/latest/download
-curl -fsSL "$BASE/$ASSET" -o "$ASSET"
-curl -fsSL "$BASE/SHA256SUMS" -o SHA256SUMS
-shasum -a 256 --ignore-missing -c SHA256SUMS
-sudo install -m 0755 "$ASSET" /usr/local/bin/clipd
-rm "$ASSET" SHA256SUMS
+curl -fsSL https://github.com/colefailla/clipd/releases/latest/download/clipd_darwin_arm64 -o clipd
+sudo install -m 0755 clipd /usr/local/bin/clipd
+rm clipd
 ```
+
+For Intel Macs, use `clipd_darwin_amd64`.
 
 ### Linux
 
-```bash
-ASSET=clipd_linux_amd64   # ARM64: clipd_linux_arm64
-BASE=https://github.com/colefailla/clipd/releases/latest/download
-curl -fsSL "$BASE/$ASSET" -o "$ASSET"
-curl -fsSL "$BASE/SHA256SUMS" -o SHA256SUMS
-sha256sum --ignore-missing -c SHA256SUMS
-sudo install -m 0755 "$ASSET" /usr/local/bin/clipd
-rm "$ASSET" SHA256SUMS
-```
-
-### Verifying provenance
-
-`SHA256SUMS` proves a download is internally consistent with the release. To
-check that the release itself was built by this repository's workflow from this
-repository's source, rather than uploaded by hand, verify its signed build
-provenance with the GitHub CLI:
+x86-64:
 
 ```bash
-gh attestation verify clipd_darwin_arm64 --repo colefailla/clipd
+curl -fsSL https://github.com/colefailla/clipd/releases/latest/download/clipd_linux_amd64 -o clipd
+sudo install -m 0755 clipd /usr/local/bin/clipd
+rm clipd
 ```
 
-### From source
+For ARM64, use `clipd_linux_arm64`.
 
 With Go installed, either platform can also use:
 
 ```bash
 go install github.com/colefailla/clipd/cmd/clipd@latest
+```
+
+Releases include `SHA256SUMS` and signed build provenance. To confirm a binary
+came from this repository's release workflow:
+
+```bash
+gh attestation verify clipd_darwin_arm64 --repo colefailla/clipd
 ```
 
 ## Setup
@@ -230,39 +220,13 @@ generated token and verify the server using a pinned public-key fingerprint.
 Anyone with the authentication token can write to your clipboard. Treat the
 token as a secret.
 
-That is worth stating concretely, because a clipboard is an unusual thing to
-grant write access to. clipd sends bytes verbatim, so someone holding the token
-can place anything at all on the clipboard — including text ending in a
-newline. If you then paste into a shell, a trailing newline runs the line
-without you pressing return. Most modern terminals defend against this with
-bracketed paste, which makes a multi-line paste inert until you confirm it, but
-Terminal.app in its default configuration is exactly the setup clipd exists to
-serve. Treat the token as controlling what your shell might execute, not just
-what you might read.
+clipd sends bytes verbatim, so someone with the token can put anything on your clipboard, including text
+ending in a newline that a paste into a shell would run without you pressing return.
 
 The token is stored locally in the clipd configuration file, which is created
 with user-only permissions. Clipboard contents and authentication tokens are
 not logged. `clipd status` warns if either the config file or the daemon's
 private key has become readable by other users.
-
-The daemon buffers each payload whole before writing it to the clipboard — a
-copy that fails partway has to leave the clipboard untouched rather than
-truncated — so its memory use would otherwise be the payload limit times the
-copy limit. `max_memory_bytes` bounds that product directly, at 64 MiB by
-default. Copies beyond it wait for room rather than being refused, and the
-budget is never smaller than one maximum payload.
-
-Connections are budgeted separately from copies, because the two cost very
-different amounts. Holding a socket open is cheap and is allowed generously;
-performing a copy reads a payload into memory and runs `pbcopy`, and is limited
-by `max_concurrent`. A connection only competes for the second budget once it
-has presented a valid token, so peers that connect and say nothing cannot crowd
-out real clients. They also get a shorter deadline than the configurable
-`timeout_ms`, which applies from the moment a client authenticates.
-
-On top of that, connections that have not yet authenticated are rationed per
-source address once enough are outstanding to matter. Authenticated clients are
-never rationed, so parallel copies from your own machine are unaffected.
 
 If the server fingerprint changes unexpectedly, do not accept the new
 fingerprint without determining why it changed.
@@ -282,8 +246,7 @@ clipd setup -rotate-cert
 Both print the new values. Clients must be reconfigured with
 `clipd configure` afterward, and will fail to copy until they are.
 
-To report a vulnerability, and for the threat model in full, see
-[SECURITY.md](SECURITY.md).
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## Troubleshooting
 
