@@ -164,11 +164,24 @@ func Copy(ctx context.Context, opts Options, payload []byte) (Result, error) {
 	// Buffering keeps the header out of its own packet, so a small copy
 	// leaves as a single segment.
 	w := bufio.NewWriter(conn)
-	if err := protocol.WriteRequest(w, opts.Token, payload); err != nil {
-		return Result{}, classifyWriteError(err)
+	writeErr := protocol.WriteRequest(w, opts.Token, payload)
+	if writeErr == nil {
+		writeErr = w.Flush()
 	}
-	if err := w.Flush(); err != nil {
-		return Result{}, newError(KindConnect, "send payload to %s: %w", opts.Address, err)
+	if writeErr != nil {
+		// A rejected frame is a local fault; there is nothing to read back.
+		if errors.Is(writeErr, protocol.ErrEmptyToken) || errors.Is(writeErr, protocol.ErrTokenTooLong) {
+			return Result{}, &Error{Kind: KindAuth, Err: writeErr}
+		}
+		// Otherwise the write failed against the network, and the most common
+		// reason is that the server rejected the request on the header alone
+		// and closed before we finished sending the body. Its status frame is
+		// already in our receive buffer, and it explains the failure far
+		// better than "broken pipe" does.
+		if status, message, err := protocol.ReadResponse(conn); err == nil && !status.OK() {
+			return Result{}, statusError(status, message)
+		}
+		return Result{}, newError(KindConnect, "send payload to %s: %w", opts.Address, writeErr)
 	}
 
 	status, message, err := protocol.ReadResponse(conn)
@@ -254,17 +267,6 @@ func handshakeError(address string, err error) *Error {
 	}
 
 	return newError(KindTLS, "TLS handshake with %s failed: %w", address, err)
-}
-
-func classifyWriteError(err error) *Error {
-	// A rejected frame is a local programming or configuration fault; a
-	// failed write is the network.
-	switch {
-	case errors.Is(err, protocol.ErrEmptyToken), errors.Is(err, protocol.ErrTokenTooLong):
-		return &Error{Kind: KindAuth, Err: err}
-	default:
-		return &Error{Kind: KindConnect, Err: err}
-	}
 }
 
 // payloadAllowance is the extra time granted for the body of a large payload.

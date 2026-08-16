@@ -174,6 +174,15 @@ func TestCopyAuthFailure(t *testing.T) {
 	}
 }
 
+// TestCopyServerSideLimit covers a payload the client would send but the
+// server refuses.
+//
+// The payload is deliberately larger than any socket buffer. The server
+// rejects on the declared length and closes without reading the body, so the
+// client's write fails partway through. It must still report "payload too
+// large" rather than the broken pipe that failure produces: with a smaller
+// payload the whole thing fits in the buffer, the write completes, and the
+// race never appears — which is how this passed on macOS and failed on Linux.
 func TestCopyServerSideLimit(t *testing.T) {
 	t.Parallel()
 
@@ -184,7 +193,7 @@ func TestCopyServerSideLimit(t *testing.T) {
 		Token:   testToken,
 		TLS:     clientTLS(t, pin),
 		Timeout: 5 * time.Second,
-	}, bytes.Repeat([]byte("x"), 4096))
+	}, bytes.Repeat([]byte("x"), 4<<20))
 	if err == nil {
 		t.Fatal("Copy succeeded despite exceeding the server's limit")
 	}
