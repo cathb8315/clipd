@@ -11,17 +11,34 @@ docker ps | clipd
 
 The output is now in the Mac's clipboard.
 
-clipd is useful when working over SSH from terminals that don't support
-OSC 52, or in environments where OSC 52 doesn't reliably reach the local
+[OSC 52](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html) does the same
+job through a terminal escape sequence, and is simpler when it works. clipd is
+for the cases where it doesn't: Terminal.app doesn't support it, and in some
+multiplexer and nested-SSH setups the sequence doesn't reliably reach the local
 terminal.
 
 ## How it works
+
+```text
+Linux                                  macOS
+
+  docker ps
+     │ stdout
+     ▼
+  clipd  ────── TLS 1.3 ──────▶  clipd serve
+  (exits)                             │
+                                      ▼
+                                   pbcopy ──▶ clipboard
+```
 
 clipd uses the same binary on both machines:
 
 - On macOS, `clipd` runs as a LaunchAgent and writes received data to the
   system clipboard.
 - On the remote machine, `clipd` reads stdin or a file and sends it to the Mac.
+
+Nothing runs in the background on Linux. Each invocation connects, sends its
+input, and exits.
 
 Connections use TLS 1.3, a pinned server key, and a shared authentication
 token.
@@ -120,6 +137,15 @@ docker ps | clipd -v
 A successful copy produces no output unless `-v` is used. Errors are written
 to stderr.
 
+Input is sent as-is without trimming or re-encoding.
+
+The default limit is 10 MiB. Input over the limit is rejected rather than
+truncated. To raise it for a single copy:
+
+```bash
+clipd copy -max-payload 20MB large.log
+```
+
 ## Commands
 
 ```text
@@ -161,10 +187,22 @@ clipd help <command>
 
 for the config file format and per-command options.
 
+## Exit codes
+
+```text
+0   success
+1   connection or server failure
+2   authentication failure
+3   payload too large
+4   configuration error
+5   TLS handshake or fingerprint mismatch
+64  usage error
+```
+
 ## Security
 
 clipd exposes a network service that can write to your Mac's clipboard. Only
-run it on networks you trust or restrict access to it with your firewall.
+expose it on networks you trust, or restrict access with a firewall.
 
 Connections are encrypted with TLS 1.3. Clients authenticate using a randomly
 generated token and verify the server using a pinned public-key fingerprint.
@@ -179,19 +217,46 @@ not logged.
 If the server fingerprint changes unexpectedly, do not accept the new
 fingerprint without determining why it changed.
 
+To replace a compromised token, on the Mac:
+
+```bash
+clipd setup -rotate
+```
+
+To replace the server keypair:
+
+```bash
+clipd setup -rotate-cert
+```
+
+Both print the new values. Clients must be reconfigured with
+`clipd configure` afterward, and will fail to copy until they are.
+
 ## Troubleshooting
+
+**`connect: connection refused`** The daemon isn't running, or the address or
+port is wrong. Run `clipd status` on the Mac; if launchd shows it as not
+loaded, run `clipd install`. Check that the client's `-server` and `-port`
+match what the Mac is listening on.
 
 **The client hangs, then times out.** Usually the macOS firewall dropping the
 connection. Allow incoming connections for clipd in System Settings → Network
 → Firewall → Options.
+
+**`server rejected the token`** The two machines have different tokens. Run
+`clipd setup` on the Mac to print the current one, then `clipd configure
+-token '<token>'` on the client.
 
 **`server key fingerprint ... does not match the pinned ...`** The daemon is
 presenting a different key. If you rotated it with `clipd setup -rotate-cert`,
 re-run `clipd configure -fingerprint`. If you didn't, investigate before
 changing anything. `clipd status` shows both fingerprints.
 
-**`this daemon requires TLS`, or `it may be running clipd v1`.** The two
-machines are on different versions. Upgrade both.
+**`did not respond with TLS: it may be running clipd v1, which is unencrypted`**
+The daemon is older than the client. Upgrade clipd on the Mac.
+
+**`this daemon requires TLS; upgrade clipd on the client machine`** The client
+is older than the daemon. Upgrade clipd on the client.
 
 ## Building
 

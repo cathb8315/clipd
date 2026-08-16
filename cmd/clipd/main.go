@@ -323,9 +323,9 @@ rejected rather than truncated.
 Options:
   -max-payload <size>   override the limit for this copy, e.g. 20MB
 
-Exit codes: 0 success, 1 connection failure, 2 authentication failure,
-3 payload too large, 4 configuration error, 5 TLS handshake or fingerprint
-mismatch, 64 usage error.`,
+Exit codes: 0 success, 1 connection or server failure, 2 authentication
+failure, 3 payload too large, 4 configuration error, 5 TLS handshake or
+fingerprint mismatch, 64 usage error.`,
 
 	"serve": `clipd serve
 
